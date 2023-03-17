@@ -5,6 +5,8 @@
 
 #include "firefly/drivers/ps2.hpp"
 #include "firefly/drivers/serial.hpp"
+#include "firefly/fs/tmpfs.hpp"
+#include "firefly/fs/vfs.hpp"
 #include "firefly/intel64/acpi/acpi.hpp"
 #include "firefly/intel64/hpet/hpet.hpp"
 #include "firefly/intel64/pit/pit.hpp"
@@ -88,6 +90,27 @@ void loop3() {
 
     firefly::drivers::ps2::init();
     tasks::Scheduler::init();
+
+    fs::VFS::init();
+    // register tmpfs fs type to the vfs
+    fs::Tmpfs::init();
+    // mount tmpfs as /
+    if (!fs::VFS::accessor().mount(fs::VFS::accessor().root, "", "/", "tmpfs")) {
+        panic("Couldn't mount tmpfs root");
+    }
+    fs::Node *root = fs::VFS::accessor().parsePath(fs::VFS::accessor().root, "/").get<1>();
+
+    // test writing/reading from file
+    auto newNode = root->filesystem->create(root, "test", false);
+    char *buf = (char *)mm::Physical::allocate(5);
+    buf = (char *)"test";
+    newNode->resource->write(buf, 0, 5);
+    debugLine << "wrote to file\n"
+              << fmt::endl;
+    memset(buf, 0x0, 5);
+    newNode->resource->read(buf, 0, 5);
+    debugLine << "read from file: " << buf << '\n'
+              << fmt::endl;
 
     auto sp1 = reinterpret_cast<uintptr_t>(mm::Physical::must_allocate(8192));
     auto sp2 = reinterpret_cast<uintptr_t>(mm::Physical::must_allocate(8192));

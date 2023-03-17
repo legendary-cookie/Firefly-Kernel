@@ -61,6 +61,7 @@ cxx_files += files(
     'kernel/intel64/cpu/apic/ioapic.cpp', 'kernel/intel64/cpu/cpu.cpp', 'kernel/trace/sanitizer/kasan.cpp',
     'kernel/memory-manager/secondary/heap.cpp',
     'kernel/tasks/scheduler.cpp',
-    'kernel/timer/timer.cpp', 'kernel/intel64/hpet/hpet.cpp'
+    'kernel/timer/timer.cpp', 'kernel/intel64/hpet/hpet.cpp',
+    'kernel/fs/vfs.cpp', 'kernel/fs/tmpfs.cpp'
 )
 asm_files += files('kernel/intel64/gdt/gdt.asm', 'kernel/intel64/int/interrupt.asm')

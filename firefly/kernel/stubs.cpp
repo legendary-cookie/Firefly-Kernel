@@ -28,6 +28,6 @@ void FRG_INTF(log)(const char *cstring) {
 }
 
 void FRG_INTF(panic)(const char *cstring) {
-	firefly::panic(cstring);
+    firefly::panic(cstring);
 }
 }
