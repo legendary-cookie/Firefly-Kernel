@@ -12,11 +12,6 @@ namespace {
 frg::manual_box<VFS> vfsSingleton;
 }  // namespace
 
-Node* VFS::createNode(Filesystem* fs, Node* parent, frg::string_view name, bool directory) {
-    Node* node = new Node(fs, parent, name, directory);
-    return node;
-}
-
 VFS& VFS::accessor() {
     return *vfsSingleton;
 }
@@ -26,7 +21,7 @@ void VFS::init() {
     vfsSingleton.initialize();
 
     auto vfs = vfsSingleton.get();
-    vfs->root = vfs->createNode(nullptr, nullptr, "", true);
+    vfs->root = new Node(nullptr, nullptr, "", true);
 }
 
 bool VFS::mount(Node* parent, frg::string_view source, frg::string_view target, frg::string_view fs_name) {
@@ -117,6 +112,8 @@ frg::tuple<Node*, Node*> VFS::parsePath(Node* parent, frg::string_view path) {
         currentNode = reduce(currentNode);
 
         Node* newNode = *currentNode->children.get(elemStr);
+        mm::heap->deallocate(elemStr);
+
         if (!newNode) {
             if (last) {
                 return frg::make_tuple(currentNode, nullptr);

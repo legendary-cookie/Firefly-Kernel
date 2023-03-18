@@ -13,19 +13,7 @@
 
 namespace firefly::kernel::fs {
 
-struct Node;
-
-using MountFunction = Node* (*)(Node*, frg::string_view, Node*);
-
-class Filesystem {
-public:
-    // create a new file/dir on the filesystem
-    // TODO: maybe stat modes for directories?
-    virtual Node* create(Node* parent, frg::string_view name, bool directory) = 0;
-
-    // populate children by e.g. reading directory entries
-    virtual void populate(Node* directory) = 0;
-};
+class Filesystem;
 
 struct Node {
     // TODO: maybe fix the +2 by rounding up in the allocator (min size) "" is passed on root creation
@@ -40,9 +28,25 @@ struct Node {
     frg::hash_map<frg::string_view, Node*, frg::hash<frg::string_view>, Allocator> children;
     frg::string<Allocator> name;
     bool directory;
+    bool populated = false;
 };
 
+class Filesystem {
+public:
+    // create a new file/dir on the filesystem
+    // TODO: maybe stat modes for directories?
+    virtual Node* create(Node* parent, frg::string_view name, bool directory) = 0;
+
+    // populate children by e.g. reading directory entries
+    virtual void populate(Node* directory) {
+        directory->populated = true;
+    };
+};
+
+
 class VFS {
+    using MountFunction = Node* (*)(Node*, frg::string_view, Node*);
+
 public:
     VFS()
         : filesystems{ frg::hash<frg::string_view>{}, Allocator() } {
@@ -54,7 +58,6 @@ public:
     static VFS& accessor();
 
 public:
-    Node* createNode(Filesystem* fs, Node* parent, frg::string_view name, bool directory);
     void registerFilesystem(MountFunction fs, frg::string_view fsname);
 
     bool mount(Node* parent, frg::string_view source, frg::string_view target, frg::string_view fs_name);

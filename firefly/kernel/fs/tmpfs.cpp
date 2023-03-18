@@ -13,7 +13,7 @@ TmpfsResource::TmpfsResource() {
 }
 
 Node* Tmpfs::create(Node* parent, frg::string_view name, bool directory) {
-    Node* node = VFS::accessor().createNode(this, parent, name, directory);
+    Node* node = new Node(this, parent, name, directory);
     TmpfsResource* res = new TmpfsResource();
 
     if (!res)
