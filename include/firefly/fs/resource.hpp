@@ -25,5 +25,11 @@ public:
     virtual ssize_t write(const void* buf, off_t offset, size_t count) {
         panic("Write not implemented by resource");
     }
+
+    virtual bool chmod(int mode) {
+        st.st_mode &= ~0777;
+        st.st_mode |= mode & 0777;
+        return true;
+    }
 };
 }  // namespace firefly::kernel::fs
