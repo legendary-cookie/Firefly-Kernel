@@ -101,7 +101,7 @@ void loop3() {
     fs::Node *root = fs::VFS::accessor().parsePath(fs::VFS::accessor().root, "/").get<1>();
 
     // test writing/reading from file
-    auto newNode = root->filesystem->create(root, "test", false);
+    auto newNode = root->filesystem->create(root, "testfile", false, 0644 | S_IFREG);
     char *buf = (char *)mm::Physical::allocate(5);
     buf = (char *)"test";
     newNode->resource->write(buf, 0, 5);
@@ -109,7 +109,7 @@ void loop3() {
               << fmt::endl;
     memset(buf, 0x0, 5);
     newNode->resource->read(buf, 0, 5);
-    debugLine << "read from file: " << buf << '\n'
+    debugLine << "Size is now (bytes): " << fmt::hex << newNode->resource->st.st_size << ", Read from file: " << buf << '\n'
               << fmt::endl;
 
     auto sp1 = reinterpret_cast<uintptr_t>(mm::Physical::must_allocate(8192));

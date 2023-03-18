@@ -56,6 +56,9 @@ void VFS::registerFilesystem(MountFunction fn, frg::string_view fsname) {
 }
 
 Node* VFS::reduce(Node* node) {
+    if (node->redir != nullptr) {
+        return reduce(node->redir);
+    }
     if (node->mountpoint != nullptr) {
         return reduce(node->mountpoint);
     }

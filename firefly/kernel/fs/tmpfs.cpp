@@ -12,16 +12,23 @@ namespace firefly::kernel::fs {
 TmpfsResource::TmpfsResource() {
 }
 
-Node* Tmpfs::create(Node* parent, frg::string_view name, bool directory) {
-    Node* node = new Node(this, parent, name, directory);
+Node* Tmpfs::create(Node* parent, frg::string_view name, bool directory, int mode) {
+    Node* node = new Node(this, parent, name, S_ISDIR(mode));
     TmpfsResource* res = new TmpfsResource();
 
     if (!res)
         panic("couldn't create tmpfs resource");
 
     node->resource = res;
-    res->data = mm::Physical::must_allocate();
-    res->capacity = 4096;
+
+    if (S_ISREG(mode)) {
+        res->capacity = 4096;
+        res->data = mm::Physical::must_allocate(res->capacity);
+    }
+
+    res->st.st_size = 0;
+    res->st.st_ino = inodeCount++;
+    res->st.st_mode = mode;
 
     return node;
 }
@@ -45,6 +52,10 @@ Resource::ssize_t TmpfsResource::write(const void* buf, Resource::off_t offset, 
 
     memcpy((void*)((off_t)this->data + offset), buf, count);
 
+    if ((offset + count) >= this->st.st_size) {
+        this->st.st_size = offset + count;
+    }
+
     ret = count;
 
     lock.unlock();
@@ -53,14 +64,17 @@ Resource::ssize_t TmpfsResource::write(const void* buf, Resource::off_t offset, 
 
 Resource::ssize_t TmpfsResource::read(void* buf, Resource::off_t offset, size_t count) {
     lock.lock();
-    ssize_t ret = -1;
 
-    // TODO: check count >= size (needs size)
+    size_t actual_count = count;
+
+    if (offset + count >= this->st.st_size) {
+        actual_count = count - ((offset + count) - this->st.st_size);
+    }
 
     memcpy(buf, (void*)((off_t)this->data + offset), count);
 
     lock.unlock();
-    return ret;
+    return actual_count;
 }
 
 static inline Tmpfs* tmpfs_instance() {
@@ -70,7 +84,7 @@ static inline Tmpfs* tmpfs_instance() {
 Node* tmpfs_mount(Node* parent, frg::string_view name, Node* source) {
     Tmpfs* new_fs = tmpfs_instance();
     Node* ret = new_fs->create(
-        parent, name, true);
+        parent, name, true, 0644 | S_IFDIR);
     return ret;
 }
 

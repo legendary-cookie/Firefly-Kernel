@@ -24,6 +24,7 @@ struct Node {
     Filesystem* filesystem;
     Node* parent;
     Node* mountpoint;
+    Node* redir;
     Resource* resource;
     frg::hash_map<frg::string_view, Node*, frg::hash<frg::string_view>, Allocator> children;
     frg::string<Allocator> name;
@@ -35,7 +36,7 @@ class Filesystem {
 public:
     // create a new file/dir on the filesystem
     // TODO: maybe stat modes for directories?
-    virtual Node* create(Node* parent, frg::string_view name, bool directory) = 0;
+    virtual Node* create(Node* parent, frg::string_view name, bool directory, int mode) = 0;
 
     // populate children by e.g. reading directory entries
     virtual void populate(Node* directory) {

@@ -2,15 +2,19 @@
 
 #include <cstddef>
 
+#include "firefly/fs/stat.hpp"
 #include "firefly/panic.hpp"
 
 namespace firefly::kernel::fs {
+
 class Resource {
 public:
     using off_t = size_t;
     // ssize: -1 == error
     // is represented by SIZE_MAX
     using ssize_t = size_t;
+
+    Stat st;
 
     // default implementations are provided as not every resource supports every type of I/O operation
     // will need proper error handling later

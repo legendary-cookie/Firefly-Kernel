@@ -26,11 +26,14 @@ class Tmpfs : public Filesystem {
     friend class TmpfsResource;
 
 public:
-    Node* create(Node* parent, frg::string_view name, bool directory);
+    Node* create(Node* parent, frg::string_view name, bool directory, int mode);
 
     void populate(Node* directory) {
     }
 
     static void init();
+
+protected:
+    uint64_t inodeCount;
 };
 }  // namespace firefly::kernel::fs
