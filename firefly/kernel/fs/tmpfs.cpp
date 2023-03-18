@@ -13,8 +13,8 @@ TmpfsResource::TmpfsResource() {
 }
 
 Node* Tmpfs::create(Node* parent, frg::string_view name, bool directory) {
-    auto node = VFS::accessor().createNode(this, parent, name, directory);
-    auto res = new (mm::heap->allocate(sizeof(TmpfsResource))) TmpfsResource();
+    Node* node = VFS::accessor().createNode(this, parent, name, directory);
+    TmpfsResource* res = new TmpfsResource();
 
     if (!res)
         panic("couldn't create tmpfs resource");
@@ -63,9 +63,8 @@ Resource::ssize_t TmpfsResource::read(void* buf, Resource::off_t offset, size_t 
     return ret;
 }
 
-static Tmpfs* tmpfs_instance() {
-    auto new_fs = new (mm::heap->allocate(sizeof(Tmpfs))) Tmpfs();
-    return new_fs;
+static inline Tmpfs* tmpfs_instance() {
+    return new Tmpfs();
 }
 
 Node* tmpfs_mount(Node* parent, frg::string_view name, Node* source) {

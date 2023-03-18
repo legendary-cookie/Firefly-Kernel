@@ -13,7 +13,7 @@ frg::manual_box<VFS> vfsSingleton;
 }  // namespace
 
 Node* VFS::createNode(Filesystem* fs, Node* parent, frg::string_view name, bool directory) {
-    Node* node = new (mm::heap->allocate(sizeof(Node))) Node(fs, parent, name, directory);
+    Node* node = new Node(fs, parent, name, directory);
     return node;
 }
 
