@@ -5,6 +5,7 @@
 #include "firefly/logger.hpp"
 #include "firefly/memory-manager/primary/primary_phys.hpp"
 #include "firefly/memory-manager/secondary/heap.hpp"
+#include "frg/string.hpp"
 #include "libk++/memory.hpp"
 
 namespace firefly::kernel::fs {
@@ -12,7 +13,9 @@ namespace firefly::kernel::fs {
 TmpfsResource::TmpfsResource() {
 }
 
-Node* Tmpfs::create(Node* parent, frg::string_view name, bool directory, int mode) {
+Node* Tmpfs::create(Node* parent, frg::string_view name, int mode) {
+    debugLine << "Creating tmpfs file with name " << name.data() << '\n'
+              << fmt::endl;
     Node* node = new Node(this, parent, name, S_ISDIR(mode));
     TmpfsResource* res = new TmpfsResource();
 
@@ -30,6 +33,23 @@ Node* Tmpfs::create(Node* parent, frg::string_view name, bool directory, int mod
     res->st.st_ino = inodeCount++;
     res->st.st_mode = mode;
 
+    return node;
+}
+
+
+Node* Tmpfs::symlink(Node* parent, frg::string_view name, frg::string_view target) {
+    Node* node = new Node(this, parent, name, false);
+    if (!node)
+        panic("Couldn't create node");
+
+    TmpfsResource* res = new TmpfsResource();
+    if (!res)
+        panic("Couldn't create resource");
+
+    res->st.st_mode = 0777 | S_IFLNK;
+
+    node->resource = res;
+    node->symlink_target += target;
     return node;
 }
 
@@ -77,14 +97,10 @@ Resource::ssize_t TmpfsResource::read(void* buf, Resource::off_t offset, size_t 
     return actual_count;
 }
 
-static inline Tmpfs* tmpfs_instance() {
-    return new Tmpfs();
-}
-
 Node* tmpfs_mount(Node* parent, frg::string_view name, Node* source) {
-    Tmpfs* new_fs = tmpfs_instance();
-    Node* ret = new_fs->create(
-        parent, name, true, 0644 | S_IFDIR);
+    Tmpfs* newFS = new Tmpfs();
+    Node* ret = newFS->create(
+        parent, name, 0644 | S_IFDIR);
     return ret;
 }
 

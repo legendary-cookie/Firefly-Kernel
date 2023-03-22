@@ -1,5 +1,6 @@
 #include "firefly/kernel.hpp"
 
+#include <cstdint>
 #include <frg/array.hpp>
 #include <frg/vector.hpp>
 
@@ -16,6 +17,9 @@
 #include "firefly/panic.hpp"
 #include "firefly/tasks/scheduler.hpp"
 #include "firefly/timer/timer.hpp"
+#include "frg/hash.hpp"
+#include "frg/hash_map.hpp"
+#include "frg/string.hpp"
 
 [[maybe_unused]] constexpr short MAJOR_VERSION = 0;
 [[maybe_unused]] constexpr short MINOR_VERSION = 0;
@@ -70,6 +74,14 @@ void loop3() {
     log_core_firefly_contributors();
     core::acpi::Acpi::accessor().dumpTables();
 
+    /*
+    auto map = frg::hash_map<frg::string_view, uint64_t, frg::hash<frg::string_view>, Allocator>({});
+    map.insert("Test", 5);
+
+    auto got = map.get("Test");
+    debugLine << "MAP TEST " << fmt::dec << reinterpret_cast<uint64_t>(*got) << '\n'
+              << fmt::endl;
+    */
 
     // Testing the heap with a vector
     frg::vector<int, Allocator> vec;
@@ -98,18 +110,24 @@ void loop3() {
     if (!fs::VFS::accessor().mount(fs::VFS::accessor().root, "", "/", "tmpfs")) {
         panic("Couldn't mount tmpfs root");
     }
+
+    debugLine << "mounted\n"
+              << fmt::endl;
+
     fs::Node *root = fs::VFS::accessor().parsePath(fs::VFS::accessor().root, "/").get<1>();
 
     // test writing/reading from file
-    auto newNode = root->filesystem->create(root, "testfile", false, 0644 | S_IFREG);
-    char *buf = (char *)mm::Physical::allocate(5);
+    auto newNode = fs::VFS::accessor().create(root, "/testdir", 0644 | S_IFDIR);
+    newNode = fs::VFS::accessor().create(newNode, "/testdir/testfile", 0644 | S_IFREG);
+    char *buf = new char[5];
     buf = (char *)"test";
     newNode->resource->write(buf, 0, 5);
     debugLine << "wrote to file\n"
               << fmt::endl;
+    // zero buffer so we can confirm it is reading successfully
     memset(buf, 0x0, 5);
     newNode->resource->read(buf, 0, 5);
-    debugLine << "Size is now (bytes): " << fmt::hex << newNode->resource->st.st_size << ", Read from file: " << buf << '\n'
+    debugLine << "Size is now (bytes): " << fmt::hex << newNode->resource->st.st_size << ", Buffer read from file: " << buf << '\n'
               << fmt::endl;
 
     auto sp1 = reinterpret_cast<uintptr_t>(mm::Physical::must_allocate(8192));

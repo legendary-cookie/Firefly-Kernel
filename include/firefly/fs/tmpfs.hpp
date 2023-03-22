@@ -26,7 +26,9 @@ class Tmpfs : public Filesystem {
     friend class TmpfsResource;
 
 public:
-    Node* create(Node* parent, frg::string_view name, bool directory, int mode);
+    Node* create(Node* parent, frg::string_view name, int mode);
+
+    Node* symlink(Node* parent, frg::string_view name, frg::string_view target);
 
     void populate(Node* directory) {
     }

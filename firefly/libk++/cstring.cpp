@@ -90,3 +90,9 @@ char *strtok(char *s, const char *delimiters) {
     return token;
 }
 }  // namespace firefly::libkern::cstring
+
+extern "C" {
+size_t strlen(const char *str) {
+    return firefly::libkern::cstring::strlen(str);
+}
+}

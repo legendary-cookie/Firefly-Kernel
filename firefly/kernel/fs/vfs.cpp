@@ -1,23 +1,28 @@
 #include "firefly/fs/vfs.hpp"
 
+#include <cstring>
+
 #include "firefly/logger.hpp"
+#include "firefly/memory-manager/primary/primary_phys.hpp"
 #include "firefly/memory-manager/secondary/heap.hpp"
 #include "firefly/panic.hpp"
 #include "frg/manual_box.hpp"
 #include "frg/tuple.hpp"
 #include "libk++/cstring.hpp"
+#include "libk++/memory.hpp"
 
 namespace firefly::kernel::fs {
 namespace {
 frg::manual_box<VFS> vfsSingleton;
 }  // namespace
 
+
 VFS& VFS::accessor() {
     return *vfsSingleton;
 }
 
 void VFS::init() {
-    if (vfsSingleton.valid()) panic("Tried to init twice");
+    if (vfsSingleton.valid()) panic("Tried to init VFS twice");
     vfsSingleton.initialize();
 
     auto vfs = vfsSingleton.get();
@@ -25,29 +30,56 @@ void VFS::init() {
 }
 
 bool VFS::mount(Node* parent, frg::string_view source, frg::string_view target, frg::string_view fs_name) {
+    lock.lock();
+
     MountFunction fs_mount = *filesystems.get(fs_name);
-    if (!fs_mount)
+    if (!fs_mount) {
+        debugLine << "ENODEV\n"
+                  << fmt::endl;
         return false;
+    }
 
     Node* sourceNode = nullptr;
+
     if (source != "" && source.size() != 0) {
         auto res = parsePath(parent, source);
         sourceNode = res.get<1>();
-        if (sourceNode == nullptr) panic("VFS null");
-        if (sourceNode->directory) panic("directory");
+        if (sourceNode == nullptr) {
+            return false;
+        }
+        if (S_ISDIR(sourceNode->resource->st.st_mode)) {
+            debugLine << "Tried to mount root to directory\n"
+                      << fmt::endl;
+            return false;
+        }
     }
 
     auto res = parsePath(parent, target);
-    bool mounting_root = res.get<1>() == root;
-    if (!mounting_root && !res.get<1>()->directory) panic("no directory");
-    if (res.get<1>() == nullptr) panic("== null");
+    auto targetParent = res.get<0>();
+    auto targetNode = res.get<1>();
 
-    Node* mountNode = fs_mount(res.get<0>(), fs_name, sourceNode);
-    if (!mountNode)
-        panic("Couldnt mount");
+    bool mounting_root = targetNode == root;
 
-    res.get<1>()->mountpoint = mountNode;
+    if (!mounting_root && !targetNode->directory) {
+        debugLine << "Mount error: " << target.data() << "isn't a directory\n"
+                  << fmt::endl;
+        return false;
+    }
 
+    Node* mountNode = fs_mount(targetParent, fs_name, sourceNode);
+
+    if (!mountNode) {
+        debugLine << "Mount error: Mounting failed\n"
+                  << fmt::endl;
+        return false;
+    }
+
+    targetNode->mountpoint = mountNode;
+
+    debugLine << "Mounting " << source.data() << " to " << target.data() << '\n'
+              << fmt::endl;
+
+    lock.unlock();
     return true;
 }
 
@@ -55,12 +87,19 @@ void VFS::registerFilesystem(MountFunction fn, frg::string_view fsname) {
     filesystems.insert(fsname, fn);
 }
 
-Node* VFS::reduce(Node* node) {
+Node* VFS::reduce(Node* node, bool followSymlinks) {
     if (node->redir != nullptr) {
-        return reduce(node->redir);
+        return reduce(node->redir, followSymlinks);
     }
     if (node->mountpoint != nullptr) {
-        return reduce(node->mountpoint);
+        return reduce(node->mountpoint, followSymlinks);
+    }
+
+    if (followSymlinks && node->symlink_target != "") {
+        auto res = parsePath(node->parent, node->symlink_target);
+        if (!res.get<1>())
+            return nullptr;
+        return reduce(res.get<1>(), followSymlinks);
     }
 
     return node;
@@ -68,28 +107,26 @@ Node* VFS::reduce(Node* node) {
 
 // Taken from Lyre Kernel:
 // I want to change this, maybe make it more 'c++'y
-// temporary solution
+// probably temporary solution
 frg::tuple<Node*, Node*> VFS::parsePath(Node* parent, frg::string_view path) {
     if (path.size() == 0) {
+        debugLine << "ENOENT\n"
+                  << fmt::endl;
         return frg::make_tuple(nullptr, nullptr);
     }
 
-    auto pathLen = path.size();
-
-    bool ask_for_dir = path[pathLen - 1] == '/';
+    bool ask_for_dir = path[path.size() - 1] == '/';
 
     size_t index = 0;
-
-    Node* currentNode = reduce(parent);
+    Node* current_node = reduce(parent, false);
 
     // populate
 
     if (path[index] == '/') {
-        currentNode = reduce(this->root);
-
+        current_node = reduce(this->root, false);
         while (path[index] == '/') {
-            if (index == pathLen - 1) {
-                return frg::make_tuple(currentNode, currentNode);
+            if (index == path.size() - 1) {
+                return frg::make_tuple(current_node, current_node);
             }
             index++;
         }
@@ -97,51 +134,90 @@ frg::tuple<Node*, Node*> VFS::parsePath(Node* parent, frg::string_view path) {
 
     for (;;) {
         const char* elem = &path[index];
-        size_t elemLen = 0;
+        size_t elem_len = 0;
 
-        while (index < pathLen && path[index] != '/') {
-            elemLen++, index++;
-        }
-
-        while (index < pathLen && path[index] == '/') {
+        while (index < path.size() && path[index] != '/') {
+            elem_len++;
             index++;
         }
 
-        bool last = index == pathLen;
+        while (index < path.size() && path[index] == '/') {
+            index++;
+        }
 
-        char* elemStr = (char*)mm::heap->allocate(elemLen + 1);
-        memcpy(elemStr, elem, elemLen);
+        bool last = index == path.size();
 
-        currentNode = reduce(currentNode);
+        char* elem_str = static_cast<char*>(mm::Physical::allocate(elem_len + 1));
+        memcpy(elem_str, elem, elem_len);
 
-        Node* newNode = *currentNode->children.get(elemStr);
-        mm::heap->deallocate(elemStr);
+        current_node = reduce(current_node, false);
 
-        if (!newNode) {
+        Node** nodes = current_node->children.get(elem_str);
+        if (nodes == nullptr) {
+            debugLine << "ENOENT\n"
+                      << fmt::endl;
             if (last) {
-                return frg::make_tuple(currentNode, nullptr);
+                return frg::make_tuple(current_node, nullptr);
             }
             return frg::make_tuple(nullptr, nullptr);
         }
 
-        newNode = reduce(newNode);
+        auto new_node = *nodes;
+
+        new_node = reduce(new_node, false);
+
         // populate
 
         if (last) {
-            if (ask_for_dir && !newNode->directory) {
-                return frg::make_tuple(currentNode, nullptr);
+            if (ask_for_dir && !S_ISDIR(new_node->resource->st.st_mode)) {
+                debugLine << "ENOTDIR\n"
+                          << fmt::endl;
+                return frg::make_tuple(current_node, nullptr);
             }
-            return frg::make_tuple(currentNode, newNode);
+            return frg::make_tuple(current_node, new_node);
         }
 
-        currentNode = newNode;
+        current_node = new_node;
 
-        if (!currentNode->directory) {
+        // check for link
+
+        if (!S_ISDIR(current_node->resource->st.st_mode)) {
+            debugLine << "ENOTDIR\n"
+                      << fmt::endl;
             return frg::make_tuple(nullptr, nullptr);
         }
     }
 
+    debugLine << "ENOENT\n"
+              << fmt::endl;
     return frg::make_tuple(nullptr, nullptr);
+}
+
+Node* VFS::create(Node* parent, frg::string_view name, int mode) {
+    lock.lock();
+
+    auto res = parsePath(parent, name);
+    // debugLine << "CREATE RES #0 0x" << fmt::hex << reinterpret_cast<uint64_t>(res.get<0>()) << " RES #1 0x" << fmt::hex << reinterpret_cast<uintptr_t>(res.get<1>()) << '\n' << fmt::endl;
+
+    if (!res.get<0>()) {
+        panic("Couldn't find path");
+        return nullptr;
+    }
+    if (res.get<1>()) {
+        panic("Path already exists");
+        return nullptr;
+    }
+
+    auto fs = res.get<0>()->filesystem;
+    auto lastSlash = name.find_last('/');
+    auto basename = name.sub_string(lastSlash + 1, name.size() - lastSlash - 1);
+    auto node = fs->create(res.get<0>(), basename, mode);
+
+    // insert into parent directory entries
+    res.get<0>()->children.insert(basename, node);
+
+    lock.unlock();
+    return node;
 }
 
 }  // namespace firefly::kernel::fs
