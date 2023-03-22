@@ -76,7 +76,7 @@ bool VFS::mount(Node* parent, frg::string_view source, frg::string_view target, 
 
     targetNode->mountpoint = mountNode;
 
-    debugLine << "Mounting " << source.data() << " to " << target.data() << '\n'
+    debugLine << "Mounted " << source.data() << " to " << target.data() << '\n'
               << fmt::endl;
 
     lock.unlock();
@@ -147,6 +147,7 @@ frg::tuple<Node*, Node*> VFS::parsePath(Node* parent, frg::string_view path) {
 
         bool last = index == path.size();
 
+        // TODO: Figure out WHY allocating with heap alloc panics
         char* elem_str = static_cast<char*>(mm::Physical::allocate(elem_len + 1));
         memcpy(elem_str, elem, elem_len);
 

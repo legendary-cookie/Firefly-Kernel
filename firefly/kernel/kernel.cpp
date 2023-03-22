@@ -111,9 +111,6 @@ void loop3() {
         panic("Couldn't mount tmpfs root");
     }
 
-    debugLine << "mounted\n"
-              << fmt::endl;
-
     fs::Node *root = fs::VFS::accessor().parsePath(fs::VFS::accessor().root, "/").get<1>();
 
     // test writing/reading from file

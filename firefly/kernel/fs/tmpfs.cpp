@@ -14,8 +14,7 @@ TmpfsResource::TmpfsResource() {
 }
 
 Node* Tmpfs::create(Node* parent, frg::string_view name, int mode) {
-    debugLine << "Creating tmpfs file with name " << name.data() << '\n'
-              << fmt::endl;
+    // debugLine << "Creating tmpfs file with name " << name.data() << '\n' << fmt::endl;
     Node* node = new Node(this, parent, name, S_ISDIR(mode));
     TmpfsResource* res = new TmpfsResource();
 

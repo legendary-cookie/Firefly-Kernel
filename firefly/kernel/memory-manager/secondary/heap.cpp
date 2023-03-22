@@ -61,7 +61,7 @@ void kernelHeap::init() {
 VirtualAddress kernelHeap::allocate(size_t size) const {
     // stupid string "" needs only one byte
     if (size >= 0 && size < 2) {
-        // TODO: I'LL LEAVE IT LIKE THIS; IDK WHAT HAPPENS
+        // TODO: I'LL LEAVE IT LIKE THIS FOR NOW
         debugLine << "heap string thing\n"
                   << fmt::endl;
         size = 2;
