@@ -71,10 +71,11 @@ void loop3() {
 
     // Testing the heap with a vector
     frg::vector<int, Allocator> vec;
-    vec.push(1);
-    vec.push(2);
-    vec.push(3);
-    logLine << "Vec.size: " << vec.size() << ", vec.front: " << vec.front() << "\n"
+    for (int i = 0; i < 10; i++) {
+        vec.push(0xA1);
+    }
+
+    logLine << "Vec.size: " << fmt::dec << vec.size() << ", vec.front: 0x" << fmt::hex << reinterpret_cast<uintptr_t>(&vec.front()) << "\n"
             << fmt::endl;
 
     // Testing the heap with allocations
@@ -82,8 +83,16 @@ void loop3() {
     logLine << "ptr=" << fmt::hex << reinterpret_cast<uintptr_t>(ptr) << '\n'
             << fmt::endl;
 
-    auto ptr2 = mm::heap->allocate(sizeof(int));
-    logLine << "ptr=" << fmt::hex << reinterpret_cast<uintptr_t>(ptr2) << '\n'
+    ptr = mm::heap->allocate(sizeof(int));
+    logLine << "ptr=" << fmt::hex << reinterpret_cast<uintptr_t>(ptr) << '\n'
+            << fmt::endl;
+
+    ptr = mm::heap->allocate(32);
+    logLine << "ptr=" << fmt::hex << reinterpret_cast<uintptr_t>(ptr) << '\n'
+            << fmt::endl;
+
+    ptr = mm::heap->allocate(32);
+    logLine << "ptr=" << fmt::hex << reinterpret_cast<uintptr_t>(ptr) << '\n'
             << fmt::endl;
 
     firefly::drivers::ps2::init();

@@ -67,8 +67,8 @@ public:
         if (sz < object_size)
             sz = object_size;
 
-        if (!slabHelper::powerOfTwo(size))
-            size = slabHelper::alignToSecondPower(size);
+        if (!slabHelper::powerOfTwo(sz))
+            sz = slabHelper::alignToSecondPower(sz);
 
         size = sz;
         slab_type = slabTypeOf(sz);
@@ -83,7 +83,7 @@ public:
         VirtualAddress object;
 
         auto do_dequeue = [&]() {
-            return (object = reinterpret_cast<VirtualAddress>(_slab->object_queue.dequeue()));
+            return (object = static_cast<VirtualAddress>(_slab->object_queue.dequeue()));
         };
 
         // Check if we can allocate an object from the partial slab
@@ -216,6 +216,7 @@ private:
             // If we don't do this we will end up overwriting the object we just created.
             logLine << "base addr of slab=" << fmt::hex << address << '\n'
                     << fmt::endl;
+
             address += sizeof(slab);
             address = (address + sizeof(slab) - 1) & ~(sizeof(slab) - 1);
             base_address = address;

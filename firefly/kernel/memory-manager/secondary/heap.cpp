@@ -10,6 +10,8 @@
 
 namespace firefly::kernel::mm {
 
+constexpr bool debugHeap = false;
+
 BuddyAllocator vm_buddy;
 
 // Todo:
@@ -23,6 +25,11 @@ struct VmBackingAllocator {
 
         if (ptr == nullptr)
             panic("vm_buddy returned a null-pointer, heap is OOM.");
+
+        if constexpr (debugHeap) {
+            debugLine << "Heap VM Allocated " << fmt::hex << reinterpret_cast<uintptr_t>(ptr) << '\n'
+                      << fmt::endl;
+        }
 
         return VirtualAddress(ptr);
     }
@@ -39,7 +46,7 @@ struct LockingMechanism {
 // Allocatable sizes: 8, 16, 32 64, 128, 256, 512, 1024, 2048, 4096.
 // Allocation requests for sizes lower than the minimum, 8, will be served with the minimum size (8).
 using cacheType = slabCache<VmBackingAllocator, LockingMechanism>;
-frg::array<cacheType, 9> kernelAllocatorCaches = {};
+frg::array<cacheType, 10> kernelAllocatorCaches = {};
 
 constinit frg::manual_box<kernelHeap> heap;
 
@@ -54,18 +61,39 @@ void kernelHeap::init() {
     vm_buddy.init(reinterpret_cast<uint64_t*>(AddressLayout::SlabHeap), BuddyAllocator::largest_allowed_order);
 
     heap.initialize();
-    for (size_t i = 0, j = 3; i < kernelAllocatorCaches.size(); i++, j++)
+    for (size_t i = 0, j = 3; i < kernelAllocatorCaches.size(); i++, j++) {
+        if constexpr (debugHeap) {
+            debugLine << "init cache " << fmt::dec << i << ", with size " << fmt::dec << (1 << j) << '\n'
+                      << fmt::endl;
+        }
+
         kernelAllocatorCaches[i].initialize(1 << j, "heap");
+    }
 }
 
 VirtualAddress kernelHeap::allocate(size_t size) const {
-    assert_truth(size >= 2 && size <= 4096 && "Invalid allocation size");
+    if (size < 8) {
+        if constexpr (debugHeap) {
+            debugLine << "heap alloc size under smallest\n"
+                      << fmt::endl;
+        }
+        size = 8;
+    }
+
+    assert_truth(size <= 4096 && "Invalid allocation size");
 
     if (!slabHelper::powerOfTwo(size))
         size = slabHelper::alignToSecondPower(size);
 
-    auto& cache = kernelAllocatorCaches[log2(size) - 1];
-    return cache.allocate();
+    auto& cache = kernelAllocatorCaches[log2(size) - 2 - 1];
+    auto ptr = cache.allocate();
+
+    if constexpr (debugHeap) {
+        debugLine << "Heap allocated (size=" << fmt::dec << size << "): 0x" << fmt::hex << reinterpret_cast<uintptr_t>(ptr) << '\n'
+                  << fmt::endl;
+    }
+
+    return ptr;
 }
 
 void kernelHeap::deallocate(VirtualAddress ptr) const {
@@ -73,10 +101,13 @@ void kernelHeap::deallocate(VirtualAddress ptr) const {
         return;
 
     auto aligned_address = (reinterpret_cast<uintptr_t>(ptr) >> PAGE_SHIFT) << PAGE_SHIFT;
+
     auto size = pagelist.phys_to_page(aligned_address - AddressLayout::SlabHeap)->slab_size;
-    // assert_truth(size >= 2 && size <= 4096 && "Invalid deallocation size");
+
+    assert_truth(size <= 4096 && "Invalid deallocation size");
     if (size < 8) return;
-    auto& cache = kernelAllocatorCaches[log2(size) - 1];
+
+    auto& cache = kernelAllocatorCaches[log2(size) - 2 - 1];
     cache.deallocate(ptr);
 }
 
