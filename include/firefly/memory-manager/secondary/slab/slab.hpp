@@ -224,7 +224,7 @@ private:
                 // TODO: VmBackingAllocator should do this.
                 // Marks each 4kib page as a slab page.
                 if (i % PageSize::Size4K == 0) {
-                    auto const& page = pagelist.phys_to_page(i - AddressLayout::SlabHeap);
+                    auto const& page = pagelist->phys_to_page(i - AddressLayout::SlabHeap);
                     page->flags = RawPageFlags::Slab;
                     page->slab_size = sz;
                 }

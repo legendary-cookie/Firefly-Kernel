@@ -28,7 +28,7 @@ void kernelPageSpace::init() {
 
     auto const &self = kPageSpaceSingleton.get();
 
-    self->mapRange(PageSize::Size4K, buddy.get_highest_address(), AccessFlags::ReadWrite, AddressLayout::Low);
+    self->mapRange(PageSize::Size4K, buddy->get_highest_address(), AccessFlags::ReadWrite, AddressLayout::Low);
 
     if (self->hugePages) {
         self->mapRange(0, GiB(4), AccessFlags::ReadWrite, AddressLayout::High, PageSize::Size1G);

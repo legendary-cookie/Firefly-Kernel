@@ -9,9 +9,10 @@
 
 #include "firefly/compiler/compiler.hpp"
 #include "firefly/limine.hpp"
+#include "firefly/logger.hpp"
 #include "firefly/memory-manager/mm.hpp"
+#include "frg/manual_box.hpp"
 #include "libk++/bits.h"
-extern uintptr_t GLOB_PAGE_ARRAY[];
 
 enum class RawPageFlags : int {
     None = 0,
@@ -62,6 +63,7 @@ public:
                 auto const page = RawPage{
                     .flags = (e->type != LIMINE_MEMMAP_USABLE) ? RawPageFlags::Unusable : RawPageFlags::None
                 };
+                using namespace firefly;
                 pages[largest_index] = page;
             }
         }
@@ -107,9 +109,9 @@ private:
         AddressType address;
     };
 
-    RawPage *pages = (struct RawPage *)(reinterpret_cast<uintptr_t>(GLOB_PAGE_ARRAY));
+    RawPage *pages = (struct RawPage *)(0xFFFFD00000000000 + MiB(512));
     Index largest_index{};  // largest index into the 'pages' array
 };
 
 // Instance created in primary_phys.cpp
-extern Pagelist pagelist;
+extern frg::manual_box<Pagelist> pagelist;

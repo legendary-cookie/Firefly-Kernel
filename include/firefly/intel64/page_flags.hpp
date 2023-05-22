@@ -55,7 +55,7 @@ union Pte {
             .pagesize = check_flags(flags, 7),  // PS/PAT bit
             .global = check_flags(flags, 8),
             .ignore = 0,
-            .address = pagelist.pfn(addr)  // Page Frame Number
+            .address = pagelist->pfn(addr)  // Page Frame Number
         };
     }
 };

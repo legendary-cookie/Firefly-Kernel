@@ -329,7 +329,7 @@ public:
                 auto base = reinterpret_cast<uint64_t>(ptr.unpack());
 
                 for (int j = 0; j < npages; j++, base += 4096) {
-                    auto page = pagelist.phys_to_page(base);
+                    auto page = pagelist->phys_to_page(base);
                     page->refcount++;
                     page->order = ptr.order;
                     page->buddy_index = i;
@@ -346,7 +346,7 @@ public:
 
     void free(AddressType ptr) {
         buddyLock.lock();
-        auto page = pagelist.phys_to_page(reinterpret_cast<uint64_t>(ptr));
+        auto page = pagelist->phys_to_page(reinterpret_cast<uint64_t>(ptr));
 
         // Not a buddy page
         if (!page->is_buddy_page(BuddyAllocator::min_order)) {
@@ -358,12 +358,12 @@ public:
         int buddy_index = page->buddy_index;
         int order = page->order;
 
-        // Mark the pages in the pagelist as free and perform some checks
+        // Mark the pages in the pagelist->as free and perform some checks
         auto npages = (1 << (page->order + 3)) / 4096;
         auto base = reinterpret_cast<uint64_t>(ptr);
 
         for (auto i = 0; i < npages; i++, base += 4096) {
-            page = pagelist.phys_to_page(base);
+            page = pagelist->phys_to_page(base);
             assert_truth(page->refcount == 1 && "This pages refcount is not 1. This means that there was an attempt to free an actively used block of memory");
             page->reset();
         }
@@ -449,4 +449,4 @@ private:
 };
 
 // Instance created in primary_phys.cpp
-extern BuddyManager buddy;
+extern frg::manual_box<BuddyManager> buddy;
