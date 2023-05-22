@@ -14,6 +14,8 @@
 #include "frg/manual_box.hpp"
 #include "libk++/bits.h"
 
+constexpr uintptr_t GLOB_PAGE_ARRAY = 0xFFFFD00000000000 + MiB(512);
+
 enum class RawPageFlags : int {
     None = 0,
     Unusable = 1,
@@ -109,7 +111,7 @@ private:
         AddressType address;
     };
 
-    RawPage *pages = (struct RawPage *)(0xFFFFD00000000000 + MiB(512));
+    RawPage *pages = (struct RawPage *)(GLOB_PAGE_ARRAY);
     Index largest_index{};  // largest index into the 'pages' array
 };
 
